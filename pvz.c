@@ -158,6 +158,7 @@ int main(void)
         for(int k = 0; k < 20; k++){
 			uint8_t first = peashooter_map[z+1];
 			uint8_t second = peashooter_map[z];
+            plot_pixel(k, i, grass_map[z+1] << 8 | grass_map[z]);
 			short int colour = first << 8 | second;
 			if(first != 0xff && second != 0xff){
 				if(first != 0xf7 && second != 0x9e){
@@ -165,7 +166,6 @@ int main(void)
 				}
 				
 			}
-            
 			z+=2;
         }
     }
