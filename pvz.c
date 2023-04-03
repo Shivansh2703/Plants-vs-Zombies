@@ -7,6 +7,7 @@
 /* This files provides address values that exist in the system */
 #include <stdbool.h>
 #include <images.h>
+#include <stdint.h>
 #define SDRAM_BASE            0xC0000000
 #define FPGA_ONCHIP_BASE      0xC8000000
 #define FPGA_CHAR_BASE        0xC9000000
@@ -148,11 +149,23 @@ int main(void)
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
     clear_screen(); // pixel_buffer_start points to the pixel buffer
 
-    for(int i = 0; i < image_x_size; i++){
-        for(int k = 0; k < image_y_size; k++){
-            plot_pixel(i, k, peashooter_map[i][k]);
+    int z = 0;
+    for(int i = 10; i < 30; i++){
+        for(int k = 0; k < 20; k++){
+			uint8_t first = peashooter_map[z+1];
+			uint8_t second = peashooter_map[z];
+			short int colour = first << 8 | second;
+			if(first != 0xff && second != 0xff){
+				if(first != 0xf7 && second != 0x9e){
+					plot_pixel(k, i, colour);
+				}
+				
+			}
+            
+			z+=2;
         }
     }
+
     wait_for_vsync(); // swap front and back buffers on VGA vertical sync
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
 
