@@ -11,8 +11,8 @@
 #define FPGA_ONCHIP_BASE      0xC8000000
 #define FPGA_CHAR_BASE        0xC9000000
 
-#define image_x_size 39
-#define image_y_size 19
+#define image_x_size 40
+#define image_y_size 20
 
 /* Cyclone V FPGA devices */
 #define LEDR_BASE             0xFF200000
