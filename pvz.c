@@ -46,14 +46,12 @@
 void plot_pixel(int x, int y, short int line_color);
 void draw_line(int x0, int x1, int y0, int y1, int color);
 void swap(int *x, int *y);
+void wait_for_vsync();
 void clear_screen();
 void draw_img(int x_loc, int y_loc, const uint8_t img[]);
 void draw_img_without_background(int x_loc, int y_loc, const uint8_t img[], int x_len, int y_len);
 void draw_grass();
 void draw_peashooter_icon(int x_loc, int y_loc);
-
-
-volatile int pixel_buffer_start; // global variable
 
 const uint8_t peashooter_map[] = {
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
@@ -253,30 +251,46 @@ const uint8_t num1_map[] = {
   0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
 } ;
 
+volatile int pixel_buffer_start; // global variable
 
 int main(void)
 {
     volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
     /* Read location of the pixel buffer from the pixel buffer controller */
     pixel_buffer_start = *pixel_ctrl_ptr;
+    /* set front pixel buffer to start of FPGA On-chip memory */
+    *(pixel_ctrl_ptr + 1) = 0xC8000000; // first store the address in the 
+                                        // back buffer
+    /* now, swap the front/back buffers, to set the front buffer location */
+    wait_for_vsync();
+    /* initialize a pointer to the pixel buffer, used by drawing functions */
+    pixel_buffer_start = *pixel_ctrl_ptr;
+    clear_screen(); // pixel_buffer_start points to the pixel buffer
+    /* set back pixel buffer to start of SDRAM memory */
+    *(pixel_ctrl_ptr + 1) = 0xC0000000;
+    pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
+    clear_screen(); // pixel_buffer_start points to the pixel buffer
 
     // inital setup - done only once at the start
     clear_screen();
-	draw_peashooter_icon(0, 30);
-	
 	
     // game loop - put all animations inside
 	int time = 0;
     while (1)
     {
+        pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
 		draw_grass();
+        draw_peashooter_icon(0, 30);
+        
 		draw_img_without_background(60, 20, peashooter_map, 20, 20);
 		draw_img_without_background(73 + time, 22, pea_map, 10, 10);
-		time++;
+        
 		
-		for (int i = 0; i < 4000; i++)
-		{
-		}
+        wait_for_vsync(); // swap front and back buffers on VGA vertical sync
+		pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
+		
+		
+		time+=3;
     }
 }
 
@@ -330,6 +344,20 @@ void swap(int *x, int *y){
 	int temp = *x;
 	*x = *y; 
 	*y = temp;
+}
+
+void wait_for_vsync()
+{
+	volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
+	register int status;
+	
+	*pixel_ctrl_ptr = 1;
+	
+	status = *(pixel_ctrl_ptr + 3);
+	while ((status & 0x01) != 0)
+	{
+		status = *(pixel_ctrl_ptr + 3);
+	}
 }
 
 void clear_screen(){
