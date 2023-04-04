@@ -164,7 +164,7 @@ int main(void)
 				if(first != 0xf7 && second != 0x9e){
 					plot_pixel(k, i, colour);
 				}
-				
+	
 			}
 			z+=2;
         }
