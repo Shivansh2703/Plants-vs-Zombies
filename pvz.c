@@ -57,21 +57,21 @@
 // Begin part3.c code for Lab 7
 
 
-// volatile int pixel_buffer_start; // global variable
-// volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
+volatile int pixel_buffer_start; // global variable
+volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
 
-// void plot_pixel(int x, int y, short int line_color)
-// {
-//     *(int *)(pixel_buffer_start + (y << 10) + (x << 1)) = line_color;
-// }
+void plot_pixel(int x, int y, short int line_color)
+{
+    *(int *)(pixel_buffer_start + (y << 10) + (x << 1)) = line_color;
+}
 
-// void clear_screen(){
-// 	for(int x = 0; x < RESOLUTION_X; x++){
-// 		for(int y = 0; y < RESOLUTION_Y; y++){
-// 			plot_pixel(x,y,0x0000);
-// 			}
-// 	}
-// }
+void clear_screen(){
+	for(int x = 0; x < RESOLUTION_X; x++){
+		for(int y = 0; y < RESOLUTION_Y; y++){
+			plot_pixel(x,y,0x0000);
+			}
+	}
+}
 // // code not shown for clear_screen() and draw_line() subroutines
 // void draw_line(int x0, int x1, int y0, int y1, short int colour){
 // 	bool is_steep = ABS(y1 - y0) > ABS(x1 - x0);
