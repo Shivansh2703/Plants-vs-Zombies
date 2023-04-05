@@ -1,3 +1,4 @@
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
@@ -53,8 +54,11 @@ void draw_img_without_background(int x_loc, int y_loc, const uint8_t img[], int 
 void draw_grass();
 void draw_peashooter_icon(int x_loc, int y_loc);
 void draw_plant(int type, int x_loc, int y_loc);
+void move_zombie(int index);
+void move_projectile(int index);
 struct plant* create_plant(int type, int x_loc, int y_loc);
 struct projectile* create_projectile(int x_loc, int y_loc);
+struct zombie* create_zombie(int type, int x_loc, int y_loc);
 
 struct plant{
     int health; //this is the amount of damage that the plant can take
@@ -323,7 +327,7 @@ int prev_val = 0;
 struct plant* plants[100];
 int num_plants = 0;
 struct zombie* zombies[100];
-int num_zombie = 0;
+int num_zombies = 0;
 struct projectile* projectiles[100];
 int num_projectiles = 0;
 
@@ -343,11 +347,7 @@ int main(void)
     /* set back pixel buffer to start of SDRAM memory */
     *(pixel_ctrl_ptr + 1) = 0xC0000000;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1); // we draw on the back buffer
-    clear_screen(); // pixel_buffer_start points to the pixel buffer
-
-    // inital setup - done only once at the start
-    clear_screen();
-	
+    // inital setup - done only once at the start	
 	// int pea_loc_x = 73;
 	// int pea_loc_y = 22;
 	// bool pea_collided = false;
@@ -355,7 +355,6 @@ int main(void)
 	// int zombie_loc_y = 20;
 	// bool zombie_dead = false;
     
-
     // game loop - put all animations inside
 	int time = 0;
     while (1)
@@ -381,12 +380,33 @@ int main(void)
             create_plant(1, 40 + (20 * x_coor), (20 * y_coor));
         }
 
+        if (time % 20 == 0)
+        {
+            // srand(time(NULL));
+            int row = rand() % 10;
+            create_zombie(0, 260, 20 + row * 20);
+        }
+
         for (int i = 0; i < num_plants; i++)
         {
             draw_plant(plants[i]->type, plants[i]->x_grid_location, plants[i]->y_grid_location);
             if (plants[i]->type == 1 && time % plants[i]->firing_rate == 0)
             {
                 create_projectile(plants[i]->x_grid_location, plants[i]->y_grid_location);
+            }
+        }
+        
+        for (int i = 0; i < num_zombies; i++)
+        {
+            if (zombies[i] != NULL)
+            {
+                if (zombies[i]->health <= 0)
+                {
+                    free(zombies[i]);
+                    zombies[i] = NULL;
+                }
+                draw_img_without_background(zombies[i]->x_grid_location, zombies[i]->y_grid_location, zombie_map, 12, 20);
+                move_zombie(i);    
             }
         }
 
@@ -396,15 +416,30 @@ int main(void)
             {
                 draw_img_without_background(projectiles[i]->x_grid_location, projectiles[i]->y_grid_location, pea_map, 10, 10);
                 move_projectile(i);
+                for (int j = 0; j < num_zombies; j++)
+                {
+                    if (zombies[j] != NULL && abs(zombies[j]->x_grid_location - projectiles[i]->x_grid_location) < 3 && (zombies[j]->y_grid_location - projectiles[i]->y_grid_location) == -2)
+                    {
+                        zombies[j]->health -= projectiles[i]->damage;
+                        free(projectiles[i]);
+                        projectiles[i] = NULL;
+                    }
+                }
             }
         }
 
+        
 		//draw_plant(plant1->type, plant1->x_grid_location, plant1->y_grid_location);
         wait_for_vsync(); // swap front and back buffers on VGA vertical sync
 		pixel_buffer_start = *(pixel_ctrl_ptr + 1); // new back buffer
 		
         prev_val = push_val;
 		time++;
+
+        // for (int i = 0; i < 400000; i++)
+        // {
+
+        // }
 		// pea_loc_x += 3;
 		// zombie_loc_x -= 3;
 		
@@ -551,8 +586,6 @@ void draw_plants()
         draw_plant(plants[i]->type, plants[i]->x_grid_location, plants[i]->y_grid_location);
     }
 }
-    
-
 
 struct plant* create_plant(int type, int x_loc, int y_loc)
 {
@@ -579,6 +612,24 @@ struct plant* create_plant(int type, int x_loc, int y_loc)
     return obj;
 }
 
+struct zombie* create_zombie(int type, int x_loc, int y_loc)
+{
+    struct zombie* obj = malloc(sizeof(struct zombie));
+    obj->type = type;
+    obj->x_grid_location = x_loc;
+    obj->y_grid_location = y_loc;
+
+    // if (type == 0) // Normal Stupid Zombie
+    // {
+        obj->damage = 30;
+        obj->health = 100;
+        obj->speed = 1;
+    // }
+
+    zombies[num_zombies] = obj;
+    num_zombies++;
+    return obj;
+}
 struct projectile* create_projectile(int x_loc, int y_loc)
 {
     struct projectile* obj = malloc(sizeof(struct projectile));
@@ -590,6 +641,20 @@ struct projectile* create_projectile(int x_loc, int y_loc)
     projectiles[num_projectiles] = obj;
     num_projectiles++;
     return obj;
+}
+
+void move_zombie(int index)
+{
+    if (zombies[index]!= NULL)
+    {
+        zombies[index]->x_grid_location -= zombies[index]->speed;
+
+        if (zombies[index]->x_grid_location < 60)
+        {
+            free(zombies[index]);
+            zombies[index] = NULL;
+        }
+    }
 }
 
 void move_projectile(int index)
