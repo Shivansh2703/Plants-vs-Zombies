@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <time.h>
+// #include <time.h>
 
 /* This files provides address values that exist in the system */
 #define SDRAM_BASE            0xC0000000
@@ -43,24 +43,30 @@
 
 #define FALSE 0
 #define TRUE 1
+#define INT_MAX 10000000
 	
 void plot_pixel(int x, int y, short int line_color);
 void swap(int *x, int *y);
 void wait_for_vsync();
 void clear_screen();
+void increment_suns();
 void draw_suns();
 void draw_img(int x_loc, int y_loc, const uint8_t img[]);
 void draw_num(int x_loc, int y_loc, const uint8_t img[], int x_len, int y_len);
 void draw_img_without_background(int x_loc, int y_loc, const uint8_t img[], int x_len, int y_len);
 void draw_grass();
+void draw_sidebar();
+void draw_sunflower_icon(int x_loc, int y_loc);
 void draw_peashooter_icon(int x_loc, int y_loc);
 void draw_plant(int type, int x_loc, int y_loc);
 void lawnmover_brrrrr(int index);
-void move_zombie(int index);
-void move_projectile(int index);
-struct plant* create_plant(int type, int x_loc, int y_loc);
-struct projectile* create_projectile(int x_loc, int y_loc);
-struct zombie* create_zombie(int type, int x_loc, int y_loc);
+void move_zombie(int row, int index);
+void move_projectile(int row, int index);
+void put_plant(int _prev_value, int _push_val, int _switch_val);
+struct plant* create_plant(int type, int _x_grid, int _y_grid);
+struct projectile* create_projectile(int _x_grid, int _y_grid);
+struct zombie* create_zombie(int type, int _x_grid, int _y_grid);
+struct lawnmower* create_lawnmower(int index, int _x_grid, int _y_grid);
 
 struct plant{
     int health; //this is the amount of damage that the plant can take
@@ -79,6 +85,8 @@ struct plant{
     int cost; //cost in sunflowers
     char* name;
     int firing_rate;
+    int suns_produced;
+    int put_down_time;
     // uint8_t (*img)[];
 } ;
 
@@ -97,6 +105,8 @@ struct lawnmower {
     int y_grid;
     int x_pixel;
     int y_pixel;
+    int speed;
+    int damage;
 } ;
 struct zombie{
     int health;
@@ -112,6 +122,7 @@ struct zombie{
     int speed; //number of pixels it will move across the screen by
     int damage;
     int hit_rate;
+    bool in_front_of_plant;
 } ;
 
 
@@ -137,6 +148,53 @@ const uint8_t peashooter_map[] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x98, 0xce, 0x0b, 0x7d, 0x88, 0x64, 0x2b, 0x6c, 0xdb, 0xde, 0x7d, 0xef, 0xd2, 0x94, 0xf0, 0x8c, 0x32, 0x9d, 0xfc, 0xe6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
 };
+
+
+const uint8_t sunflower_map[] = {
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf8, 0xe6, 0xd5, 0xe6, 0xde, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xd5, 0xe6, 0xb6, 0xe6, 0xf0, 0xe6, 0x8f, 0xff, 0xd4, 0xe6, 0xf6, 0xe6, 0xd5, 0xe6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x39, 0xef, 0x73, 0xde, 0x33, 0xd6, 0x91, 0xff, 0x0c, 0xef, 0xec, 0xee, 0xae, 0xff, 0x4a, 0xe6, 0xb0, 0xff, 0xcb, 0xee, 0x9d, 0xf7, 0x1a, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf6, 0xe6, 0xcf, 0xff, 0x8d, 0xff, 0x8b, 0xe6, 0x4a, 0xe6, 0xc9, 0xd5, 0x2b, 0xe6, 0xa9, 0xd5, 0x8a, 0xee, 0x28, 0xe6, 0xce, 0xee, 0xaf, 0xff, 0x19, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xbe, 0xff, 0x70, 0xd6, 0x2b, 0xd6, 0x2d, 0xf7, 0x0b, 0xf7, 0x69, 0xcd, 0x6c, 0xfe, 0x6b, 0xfe, 0x49, 0xfe, 0x49, 0xfe, 0x2b, 0xfe, 0x27, 0xcd, 0x2c, 0xff, 0x8a, 0xee, 0x73, 0xde, 0xf7, 0xe6, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0x9e, 0xf7, 0x2e, 0xf7, 0xae, 0xff, 0x69, 0xe6, 0xaa, 0xdd, 0x6a, 0xfe, 0x08, 0xdd, 0x09, 0xfe, 0xe8, 0xfd, 0xc7, 0xfd, 0xe7, 0xdc, 0xc6, 0xd4, 0xc5, 0xd4, 0x08, 0xde, 0xae, 0xff, 0x2a, 0xde, 0xdf, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0x5b, 0xef, 0x2d, 0xd6, 0x2c, 0xf7, 0xc9, 0xdd, 0x4a, 0xfe, 0x09, 0xfe, 0x8b, 0x7b, 0xc5, 0xa3, 0xa7, 0xf5, 0x66, 0xf5, 0xa8, 0x9b, 0x06, 0x83, 0xa4, 0xe4, 0xc4, 0xcc, 0x69, 0xee, 0xcf, 0xcd, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0x18, 0xef, 0x72, 0xff, 0xae, 0xff, 0x6a, 0xe6, 0xc9, 0xf5, 0x09, 0xfe, 0xc8, 0xfd, 0x42, 0x39, 0x24, 0x8b, 0x05, 0xed, 0xe5, 0xec, 0x43, 0xa3, 0x23, 0x62, 0x43, 0xdc, 0x63, 0xbb, 0x08, 0xde, 0xae, 0xff, 0xb3, 0xe6, 0xff, 0xff, 
+    0xff, 0xff, 0x5a, 0xf7, 0x0e, 0xef, 0x8e, 0xff, 0x29, 0xe6, 0xa8, 0xf5, 0x67, 0xed, 0x46, 0xf5, 0x86, 0xcc, 0xa5, 0xdc, 0xa4, 0xe4, 0x63, 0xe4, 0x23, 0xdc, 0xe3, 0xcb, 0x82, 0xcb, 0x04, 0xb3, 0x26, 0xcd, 0x4b, 0xe6, 0x17, 0xef, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0x5b, 0xef, 0x6c, 0xde, 0xe8, 0xd5, 0x06, 0xed, 0x66, 0xd4, 0x25, 0xcc, 0xe4, 0xcb, 0x64, 0xb3, 0x23, 0xb3, 0x03, 0xab, 0xa3, 0xa2, 0x22, 0xb3, 0xe3, 0xaa, 0xc4, 0xa2, 0x66, 0xcd, 0x50, 0xd6, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xb5, 0xde, 0xaf, 0xff, 0x6d, 0xff, 0x44, 0xbc, 0x43, 0xdc, 0x63, 0xdc, 0x02, 0xdc, 0x82, 0xcb, 0x23, 0xb3, 0x23, 0xb3, 0x82, 0xc3, 0x23, 0xbb, 0xc4, 0xaa, 0xc4, 0xb3, 0xc8, 0xd5, 0xb3, 0xe6, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0x5a, 0xef, 0xf1, 0xee, 0x2c, 0xde, 0x6a, 0xe6, 0x44, 0xc4, 0x82, 0xc3, 0x83, 0xcb, 0x82, 0xcb, 0x63, 0xc3, 0x23, 0xbb, 0xe4, 0xb2, 0xe4, 0xa2, 0x83, 0xab, 0xc6, 0xe5, 0xec, 0xd5, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x16, 0xef, 0xae, 0xff, 0xc7, 0xd5, 0x25, 0xcd, 0xa3, 0xb3, 0x03, 0xab, 0xe3, 0xaa, 0xe4, 0xa2, 0x83, 0xab, 0xa4, 0xc4, 0xe6, 0xe5, 0xab, 0xcd, 0x75, 0xe6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xde, 0xff, 0xd5, 0xe6, 0xd8, 0xe6, 0x2c, 0xf7, 0x66, 0xc5, 0xc7, 0xcd, 0xe6, 0xe5, 0x67, 0xcd, 0x26, 0xee, 0xaa, 0xcd, 0xc9, 0xdd, 0x18, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x6f, 0x9d, 0x8d, 0x85, 0x08, 0x75, 0x4b, 0xad, 0x13, 0xb6, 0x52, 0xde, 0x3a, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x2c, 0x6d, 0x89, 0x6d, 0xc7, 0x54, 0x8a, 0x75, 0xae, 0x85, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x5c, 0xe7, 0x29, 0x54, 0xe5, 0x43, 0x66, 0x4c, 0xc7, 0x54, 0x46, 0x44, 0xc8, 0x5c, 0x52, 0xa6, 0x5b, 0xdf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf0, 0x8d, 0x69, 0x6d, 0xea, 0x7d, 0x48, 0x6d, 0x68, 0x6d, 0x07, 0x5d, 0xc7, 0x54, 0x48, 0x65, 0x6a, 0x6d, 0x5b, 0xdf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xbe, 0xf7, 0x6d, 0x75, 0x4c, 0x6d, 0x4c, 0x75, 0xa9, 0x75, 0xea, 0x85, 0xaa, 0x75, 0x69, 0x6d, 0xa8, 0x4c, 0x8f, 0x85, 0xf9, 0xce, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xdf, 0xff, 0x52, 0xa6, 0xad, 0x7d, 0x4b, 0x6d, 0x4c, 0x75, 0x8f, 0x85, 0x9d, 0xef, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+} ;
+
+const  uint8_t wallnut_map[] = {
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x9e, 0xff, 0xf1, 0xd5, 0x4e, 0xc5, 0xb2, 0xcd, 0xf9, 0xee, 0xbf, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x5b, 0xf7, 0x09, 0xcd, 0xe7, 0xcc, 0xca, 0xe5, 0xa7, 0xed, 0x87, 0xe5, 0x49, 0xdd, 0xd9, 0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x9d, 0xf7, 0x4c, 0xd5, 0x28, 0xd5, 0x87, 0xe5, 0x86, 0xe5, 0x45, 0xe5, 0x45, 0xe5, 0x45, 0xe5, 0xe8, 0xd4, 0x12, 0xde, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7d, 0xf7, 0x0d, 0xc5, 0xa7, 0xc4, 0x26, 0xd5, 0xe4, 0xd4, 0x45, 0xe5, 0x45, 0xe5, 0x65, 0xe5, 0x45, 0xe5, 0x45, 0xe5, 0x46, 0xdd, 0x12, 0xde, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xd1, 0xd5, 0x07, 0xd5, 0x49, 0xdd, 0x45, 0xe5, 0x65, 0xe5, 0x45, 0xdd, 0x65, 0xe5, 0x45, 0xe5, 0x45, 0xe5, 0x45, 0xe5, 0x45, 0xe5, 0x26, 0xd5, 0x7d, 0xf7, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x5b, 0xf7, 0x2b, 0xcd, 0x86, 0xc4, 0x89, 0xe5, 0x45, 0xe5, 0xc6, 0xcc, 0x4d, 0xcd, 0xe8, 0xcc, 0x45, 0xe5, 0x45, 0xe5, 0x25, 0xdd, 0x29, 0xcd, 0x07, 0xd5, 0xb7, 0xe6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xcf, 0xdd, 0xa5, 0xcc, 0xa4, 0xcc, 0x45, 0xe5, 0x26, 0xd5, 0x5b, 0xf7, 0xdd, 0xff, 0xbc, 0xff, 0x6a, 0xd5, 0x45, 0xe5, 0xae, 0xd5, 0x9c, 0xf7, 0x7a, 0xf7, 0x6f, 0xcd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xdf, 0xff, 0x4b, 0xd5, 0x85, 0xc4, 0xa5, 0xcc, 0x25, 0xe5, 0x69, 0xdd, 0xfd, 0xff, 0xb7, 0xde, 0xdb, 0xff, 0x10, 0xe6, 0x45, 0xe5, 0xef, 0xdd, 0xda, 0xff, 0xda, 0xff, 0x28, 0xdd, 0x55, 0xde, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0x13, 0xde, 0x26, 0xe5, 0x24, 0xbc, 0x84, 0xcc, 0x25, 0xe5, 0x05, 0xd5, 0xf5, 0xee, 0xf9, 0xff, 0x77, 0xf7, 0x69, 0xdd, 0x05, 0xdd, 0xe5, 0xd4, 0x30, 0xe6, 0xee, 0xe5, 0x25, 0xe5, 0x6d, 0xd5, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xf0, 0xdd, 0xa4, 0xd4, 0x65, 0xc4, 0x64, 0xcc, 0x24, 0xe5, 0x04, 0xe5, 0x27, 0xdd, 0x8b, 0xdd, 0x49, 0xdd, 0xe5, 0xdc, 0x84, 0xcc, 0xc4, 0xcc, 0x25, 0xe5, 0x25, 0xe5, 0x04, 0xe5, 0xa9, 0xcc, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xf0, 0xdd, 0x23, 0xcc, 0x85, 0xc4, 0x03, 0xc4, 0xe4, 0xe4, 0x04, 0xe5, 0x04, 0xe5, 0x04, 0xe5, 0x04, 0xe5, 0x04, 0xdd, 0xe4, 0xdc, 0xe4, 0xdc, 0x04, 0xe5, 0x04, 0xe5, 0xe4, 0xdc, 0x45, 0xcc, 0x9d, 0xf7, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0x2b, 0xd5, 0x02, 0xcc, 0x64, 0xcc, 0xc2, 0xbb, 0x83, 0xd4, 0xe4, 0xe4, 0x04, 0xe5, 0x04, 0xe5, 0x04, 0xe5, 0xe4, 0xe4, 0xe4, 0xdc, 0x04, 0xdd, 0x04, 0xdd, 0xe4, 0xdc, 0xa3, 0xd4, 0x26, 0xc4, 0xdf, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0x6f, 0xcd, 0xe2, 0xc3, 0xe3, 0xbb, 0xc2, 0xbb, 0xc1, 0xbb, 0xe4, 0xe4, 0xe4, 0xe4, 0xe4, 0xdc, 0xe4, 0xe4, 0xe4, 0xe4, 0xe4, 0xe4, 0xe4, 0xe4, 0xe4, 0xe4, 0xc4, 0xe4, 0x22, 0xcc, 0x24, 0xc4, 0x3c, 0xef, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xb9, 0xe6, 0x61, 0xb3, 0x62, 0xb3, 0xa2, 0xb3, 0x81, 0xbb, 0x22, 0xcc, 0xa3, 0xdc, 0xc4, 0xdc, 0xe4, 0xdc, 0xe4, 0xe4, 0xe4, 0xdc, 0xe4, 0xe4, 0xe4, 0xdc, 0xa3, 0xdc, 0x81, 0xbb, 0x47, 0xc4, 0xdf, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0x5c, 0xf7, 0x62, 0xb3, 0x41, 0xab, 0x62, 0xab, 0x40, 0xb3, 0x81, 0xbb, 0xa1, 0xc3, 0x43, 0xd4, 0xc1, 0xc3, 0x63, 0xd4, 0xa4, 0xdc, 0xa3, 0xdc, 0xa3, 0xdc, 0x02, 0xcc, 0xa1, 0xbb, 0x36, 0xde, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xcd, 0xc4, 0x20, 0xab, 0x61, 0xb3, 0xe0, 0xa2, 0x81, 0xbb, 0x42, 0xd4, 0x81, 0xbb, 0xe2, 0xcb, 0x02, 0xcc, 0x22, 0xd4, 0x81, 0xbb, 0xa1, 0xbb, 0x81, 0xbb, 0xc3, 0xbb, 0x9d, 0xf7, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x9d, 0xf7, 0x85, 0xab, 0x00, 0xab, 0x21, 0xab, 0xe0, 0xa2, 0x61, 0xbb, 0x61, 0xbb, 0x81, 0xbb, 0x81, 0xbb, 0xc1, 0xc3, 0xe2, 0xc3, 0xc2, 0xc3, 0x21, 0xab, 0x36, 0xde, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x1a, 0xef, 0x09, 0xb4, 0x21, 0xab, 0xa0, 0x9a, 0x00, 0xab, 0x40, 0xb3, 0x02, 0xcc, 0x40, 0xb3, 0x00, 0xab, 0x20, 0xab, 0x00, 0xab, 0x29, 0xb4, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xdf, 0xff, 0x8c, 0xbc, 0x02, 0xa3, 0xa0, 0x9a, 0x00, 0xab, 0x00, 0xab, 0x00, 0xab, 0x00, 0xab, 0x00, 0xab, 0x6b, 0xb4, 0x9d, 0xf7, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xf9, 0xee, 0x0a, 0xac, 0x23, 0xa3, 0x02, 0xa3, 0xe8, 0xb3, 0x10, 0xc5, 0x15, 0xd6, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 
+} ;
 
 const int8_t pea_map[] = {
   /*Pixel format: Red: 5 bit, Green: 6 bit, Blue: 5 bit*/
@@ -533,15 +591,17 @@ int grid_end_x = 280;
 int grid_end_y = 230;
 
 bool game_over = false;
-struct plant* plants[100];
-int num_plants = 0;
-struct zombie* zombies[100];
-int num_zombies = 0;
-struct projectile* projectiles[10000];
-int num_projectiles = 0;
-
+int plant_types[5] = {1, 2, 3, 4, 5};
+struct plant* plants[10][10];
+struct zombie* zombies[10][100];
+int num_zombies_per_lane[10];
+struct projectile* projectiles[10][10000];
+int num_projectiles_per_lane[10];
 struct lawnmower* lawnmowers[10];
+
+int time = 0;
 int total_suns = 0;
+
 
 int main(void)
 {
@@ -550,116 +610,101 @@ int main(void)
     *(pixel_ctrl_ptr + 1) = 0xC8000000;
     wait_for_vsync();
     pixel_buffer_start = *pixel_ctrl_ptr;
-    // clear_screen();
+    clear_screen();
     *(pixel_ctrl_ptr + 1) = 0xC0000000;
     pixel_buffer_start = *(pixel_ctrl_ptr + 1);
 
+    for (int row = 0; row < 10; row++)
+    {
+        for (int col = 0; col < 10; col++)
+        {
+            plants[row][col] = NULL;
+        }
+    }
     for (int i = 0; i < 10; i++)
     {
-        struct lawnmower* obj = malloc(sizeof(struct lawnmower));
-        obj->is_lawnmower = true;
-        obj->x_pixel = grid_start_x - 20;
-        obj->y_pixel = grid_start_y + (20*i);
-        lawnmowers[i] = obj;
+        num_zombies_per_lane[i] = 0;
     }
-    int time = 0;
+    for (int i = 0; i < 10; i++)
+    {
+        create_lawnmower(i, -1, i);
+    }
+    
     int prev_val = 0;
     int push_val = 0;
     int switch_val = 0;
 
-    // clear_screen();
+    clear_screen();
     // game loop - put all animations inside
 	
     while (!game_over)
     {
         push_val = *push_buttons;
         switch_val = *switches;
-		clear_screen();
-		draw_grass();
-        draw_peashooter_icon(0, 40);
         
-        if (time % 10 == 0 && time > 0)
-			total_suns += 25;
-
+		// clear_screen();
+		draw_grass();
+        draw_sidebar();
+        // draw_sunflower_icon(0, 40);
+        // draw_peashooter_icon(0, 70);
+        increment_suns();
         draw_suns();
+        put_plant(prev_val, push_val, switch_val);
 
-        if (prev_val == 1 && push_val == 0)
-        {   
-            int x_coor = switch_val & 0x0F;
-            int y_coor = (switch_val & 0xF0) >> 4;
-
-            create_plant(1, grid_start_x + (20 * (x_coor - 1)), grid_start_y + (20 * (y_coor - 1)));
-        }
-
-        if (time % 10 == 0)
+        if (time % 50 == 0) // Change according to level
         {
-            // srand(time(NULL));
             int row = rand() % 10;
             create_zombie(0, 9, row);
         }
 
-        for (int i = 0; i < num_plants; i++)
+
+        for (int row = 0; row < 10; row++)
         {
-            if (plants[i]->health <= 0)
+            bool lane_has_zombie = false;
+            for (int curr_zombie = 0; curr_zombie < num_zombies_per_lane[row]; curr_zombie++)
             {
-                free(plants[i]);
-                plants[i] = NULL;
+                if (zombies[row][curr_zombie] != NULL)
+                    lane_has_zombie = true;
             }
 
-            if (plants[i] != NULL)
+            for (int col = 0; col < 10; col++)
             {
-                draw_plant(plants[i]->type, plants[i]->x_pixel, plants[i]->y_pixel);
-                if (plants[i]->type == 1 && time % plants[i]->firing_rate == 0)
+                if (plants[row][col] != NULL)
                 {
-                    create_projectile(plants[i]->x_pixel, plants[i]->y_pixel);
+                    draw_plant(plants[row][col]->type, plants[row][col]->x_pixel, plants[row][col]->y_pixel);
+                    if (plants[row][col]->type == 1 && (time - plants[row][col]->put_down_time) % plants[row][col]->firing_rate == 0)
+                    {
+                        total_suns += plants[row][col]->suns_produced;
+                    }
+                    else if (plants[row][col]->type == 2 && (time - plants[row][col]->put_down_time) % plants[row][col]->firing_rate == 0 && lane_has_zombie)
+                    {
+                        create_projectile(plants[row][col]->x_grid, plants[row][col]->y_grid);
+                    }
                 }
-            }
+            }   
         }
         
-        for (int i = 0; i < num_zombies; i++)
+        for (int i = 0; i < 10; i++)
         {
-            if (zombies[i] != NULL)
+            for (int j = 0; j < num_zombies_per_lane[i]; j++)
             {
-                if (zombies[i]->health <= 0)
+                if (zombies[i][j] != NULL)
                 {
-                    free(zombies[i]);
-                    zombies[i] = NULL;
-                }
-                else
-                {
-                    draw_img_without_background(zombies[i]->x_pixel, zombies[i]->y_pixel, zombie_map, 12, 20);
-                    bool in_front_of_plant = false;
-                    for (int j = 0; j < num_plants; j++)
-                    {
-                        if (plants[j] != NULL && (zombies[i]->x_pixel - plants[j]->x_pixel) < 40 && zombies[i]->y_pixel == plants[i]->y_pixel)
-                        {
-                            if (time % zombies[i]->hit_rate == 0)
-                                plants[j]->health -= zombies[i]->damage;
-                            
-                            in_front_of_plant = true;
-                        }
-                    }
-                    
-                    if (!in_front_of_plant)
-                        move_zombie(i);  
+                    draw_img_without_background(zombies[i][j]->x_pixel, zombies[i][j]->y_pixel, zombie_map, 12, 20);
+                    if (!zombies[i][j]->in_front_of_plant)
+                        move_zombie(i, j);  
                 }
             }
         }
 
-        for (int i = 0; i < num_projectiles; i++)
+        for (int i = 0; i < 10; i++)
         {   
-            if (projectiles[i] != NULL)
+            for (int j = 0; j < num_projectiles_per_lane[i]; j++)
             {
-                draw_img_without_background(projectiles[i]->x_pixel, projectiles[i]->y_pixel, pea_map, 10, 10);
-                move_projectile(i);
-                for (int j = 0; j < num_zombies; j++)
+                if (projectiles[i][j] != NULL)
                 {
-                    if (zombies[j] != NULL && abs(zombies[j]->x_pixel - projectiles[i]->x_pixel) < 3 && (zombies[j]->y_pixel - projectiles[i]->y_pixel) == -2)
-                    {
-                        zombies[j]->health -= projectiles[i]->damage;
-                        free(projectiles[i]);
-                        projectiles[i] = NULL;
-                    }
+                    draw_img_without_background(projectiles[i][j]->x_pixel, projectiles[i][j]->y_pixel, pea_map, 10, 10);
+                    move_projectile(i, j);
                 }
             }
         }
@@ -669,22 +714,69 @@ int main(void)
             if (!(lawnmowers[i]->is_lawnmower))
             {
                 lawnmowers[i]->x_pixel += 10;
-                if (lawnmowers[i]->x_pixel > grid_end_x)
+                if (lawnmowers[i]->x_pixel > (grid_end_x - 4))
                 {
                     free(lawnmowers[i]);
                     lawnmowers[i] = NULL;
-                }
-                    
-
-                for (int j = 0; j < num_zombies; j++)
-                {
-                    if ((lawnmowers[i]->y_pixel == zombies[j]->y_pixel) && abs(lawnmowers[i]->x_pixel - zombies[j]->x_pixel) < 15)
-                        zombies[j]->health = 0;
                 }
             }
         }
 
         
+        // collision detection
+        for (int row = 0; row < 10; row++)
+        {
+            for (int curr_zombie = 0; curr_zombie < num_zombies_per_lane[row]; curr_zombie++)
+            {
+                if (zombies[row][curr_zombie] != NULL)
+                {
+                    for (int curr_projectile = 0; curr_projectile < num_projectiles_per_lane[row]; curr_projectile++)
+                    {
+                        if (abs(zombies[row][curr_zombie]->x_pixel - projectiles[row][curr_projectile]->x_pixel) < 3)
+                        {
+                            zombies[row][curr_zombie]->health -= projectiles[row][curr_projectile]->damage;
+                            free(projectiles[row][curr_projectile]);
+                            projectiles[row][curr_projectile] = NULL;
+                        }   
+                    }
+
+                    bool in_front = false;
+                    for (int curr_plant = 0; curr_plant < 10; curr_plant++)
+                    {
+                        if (plants[row][curr_plant] != NULL && zombies[row][curr_zombie]->x_pixel - plants[row][curr_plant]->x_pixel< 20)
+                        {
+                            if (time % zombies[row][curr_zombie]->hit_rate == 0)
+                            {
+                                plants[row][curr_plant]->health -= zombies[row][curr_zombie]->damage;
+                                if (plants[row][curr_plant]->health <= 0)
+                                {
+                                    free(plants[row][curr_plant]);
+                                    plants[row][curr_plant] = NULL;
+                                }
+                            }    
+                            
+                            in_front = true;
+                        }                        
+                    }
+                    zombies[row][curr_zombie]->in_front_of_plant = in_front;
+
+                    if (lawnmowers[row] != NULL && !(lawnmowers[row]->is_lawnmower))
+                    {
+                        if (abs(lawnmowers[row]->x_pixel - zombies[row][curr_zombie]->x_pixel) < 15)
+                            zombies[row][curr_zombie]->health -= lawnmowers[row]->damage;
+                    }
+                    
+
+                    if (zombies[row][curr_zombie]->health <= 0)
+                    {
+                        free(zombies[row][curr_zombie]);
+                        zombies[row][curr_zombie] = NULL;
+                    }
+                }
+            }
+        }
+        
+
         wait_for_vsync();
 		pixel_buffer_start = *(pixel_ctrl_ptr + 1);
 		
@@ -697,7 +789,6 @@ int main(void)
     wait_for_vsync();
 }
 
-// code not shown for clear_screen() and draw_line() subroutines
 
 void plot_pixel(int x, int y, short int line_color)
 {
@@ -765,6 +856,23 @@ void draw_img_without_background(int x_loc, int y_loc, const uint8_t img[], int 
 	}
 }
 
+void draw_black(int x_loc, int y_loc, int x_len, int y_len)
+{
+    int z = 0;
+	for(int y = y_loc; y < y_loc + y_len; y++){
+		for(int x = x_loc; x < x_loc + x_len; x++){
+				plot_pixel(x, y, 0x0000);
+			z+=2;
+		}
+	}
+}
+
+
+void draw_sunflower_icon(int x_loc, int y_loc) {
+    draw_img_without_background(x_loc, y_loc, sunflower_map, 20, 20);
+    draw_img_without_background(x_loc + 30, y_loc, num5_map, 12, 20);
+	draw_img_without_background(x_loc + 45, y_loc, num0_map, 12, 20);
+}
 // Draws the peashooter image with its cost
 void draw_peashooter_icon(int x_loc, int y_loc) {
     draw_img_without_background(x_loc, y_loc, peashooter_map, 20, 20);
@@ -773,138 +881,258 @@ void draw_peashooter_icon(int x_loc, int y_loc) {
 	draw_img_without_background(x_loc + 45, y_loc, num0_map, 12, 20);
 }
 
+void draw_wallnut_icon(int x_loc, int y_loc) {
+    draw_img_without_background(x_loc, y_loc, wallnut_map, 20, 20);
+	draw_img_without_background(x_loc + 30, y_loc, num5_map, 12, 20);
+	draw_img_without_background(x_loc + 45, y_loc, num0_map, 12, 20);
+}
+
+
 void draw_grass() {
-	for (int col = 0; col < 10; col++){
-		for (int row = 0; row < 10; row++){
-            if ((col + row) % 4 == 0)
-			    draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass1_map);
-            else if ((col + row)% 4 == 1)
-                draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass3_map);
-            else if ((col + row) % 4 == 2)
-                draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass2_map);
-            else if ((col + row) % 4 == 3)
-                draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass4_map);
-		}
+	for (int col = -1; col < 11; col++){
+		for (int row = -1; row < 11; row++){
+            if (col != -1 && col != 10 && row != -1 && row != 10)
+            {
+                if ((col + row) % 4 == 0)
+			        draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass1_map);
+                else if ((col + row)% 4 == 1)
+                    draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass3_map);
+                else if ((col + row) % 4 == 2)
+                    draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass2_map);
+                else if ((col + row) % 4 == 3)
+                    draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass4_map);
+            }
+            else
+            {
+                draw_black(grid_start_x + (20*col), grid_start_y + (20*row), 20, 20);
+            }
+        }
 	}
 
     for (int row = 0; row < 10; row++)
     {
-        if (lawnmowers[row] != NULL)
+        if (lawnmowers[row] == NULL)
+            draw_black(grid_start_x - 24, grid_start_y + (20 * row), 24, 20);
+        else if (lawnmowers[row] != NULL && lawnmowers[row]->is_lawnmower == false)
+        {
+            draw_black(grid_start_x - 24, grid_start_y + (20 * row), 24, 20);
             draw_img_without_background(lawnmowers[row]->x_pixel, lawnmowers[row]->y_pixel, lawnmower_map, 24, 20);
+        }
+        // else if (lawnmowers[row] == NULL || (lawnmowers[row] != NULL && lawnmowers[row]->is_lawnmower == false))
+        else
+            draw_img_without_background(lawnmowers[row]->x_pixel, lawnmowers[row]->y_pixel, lawnmower_map, 24, 20);
+    }
+
+
+}
+
+void draw_sidebar()
+{
+    for (int i = 0; i < 5; i++)
+    {
+        if (plant_types[i] == 1)
+        {
+            draw_sunflower_icon(0, 40 + (30 * i));
+        }
+        else if (plant_types[i] == 2)
+        {
+            draw_peashooter_icon(0, 40 + (30 * i));
+        }
+        else if (plant_types[i] == 3)
+        {
+            draw_wallnut_icon(0, 40 + (30 * i));
+        }
     }
 }
 
 void draw_plant(int type, int x_loc, int y_loc)
 {
-    if (type == 1) // Peashooter
+    if (type == 1) // Sunflower
+    {
+        draw_img_without_background(x_loc, y_loc, sunflower_map, 20, 20);
+    }
+    else if (type == 2) // Peashooter
     {
         draw_img_without_background(x_loc, y_loc, peashooter_map, 20, 20);
     }
-}
-
-void draw_plants()
-{
-    for (int i = 0; i < num_plants; i++)
+    else if (type == 3) // Wallnut
     {
-        draw_plant(plants[i]->type, plants[i]->x_pixel, plants[i]->y_pixel);
+        draw_img_without_background(x_loc, y_loc, wallnut_map, 20, 20);
     }
 }
 
-struct plant* create_plant(int type, int x_loc, int y_loc)
+void put_plant(int _prev_value, int _push_val, int _switch_val)
 {
-    
-    // if (type == 0) // Sunflowr
-    // {
-    //     obj->health = 100;
-    //     obj->cost = 50;
-    //     obj->name = "Sunflower";
-    // }
-    if (type == 1 && total_suns > 100) // Sunflower
+    if (_prev_value == 1 && _push_val == 0)
     {
-        struct plant* obj = malloc(sizeof(struct plant));
+        int x_coor = _switch_val & 0x0F;
+        int y_coor = (_switch_val & 0xF0) >> 4;
+        if (plants[y_coor - 1][x_coor - 1] == NULL)
+            create_plant(1, x_coor - 1, y_coor - 1);
+    }
+    else if (_prev_value == 2 && _push_val == 0)
+    {
+        int x_coor = _switch_val & 0x0F;
+        int y_coor = (_switch_val & 0xF0) >> 4;
+        if (plants[y_coor - 1][x_coor - 1] == NULL)
+            create_plant(2, x_coor - 1, y_coor - 1);
+    }
+    else if (_prev_value == 4 && _push_val == 0)
+    {
+        int x_coor = _switch_val & 0x0F;
+        int y_coor = (_switch_val & 0xF0) >> 4;
+        if (plants[y_coor - 1][x_coor - 1] == NULL)
+            create_plant(3, x_coor - 1, y_coor - 1);
+    }
+}
+
+struct plant* create_plant(int type, int _x_grid, int _y_grid)
+{
+    struct plant* obj = malloc(sizeof(struct plant));
+    
+    if (type == 1 && total_suns >= 50) // Sunflowr
+    {
         obj->type = type;
-        obj->x_pixel = x_loc;
-        obj->y_pixel = y_loc;
+        obj->put_down_time = time;
+        obj->x_grid = _x_grid;
+        obj->y_grid = _y_grid;
+        obj->x_pixel = grid_start_x + (20 * obj->x_grid);
+        obj->y_pixel = grid_start_y + (20 * obj->y_grid);
+        obj->health = 100;
+        obj->cost = 50;
+        obj->name = "Sunflower";
+        obj->suns_produced = 10;
+        obj->firing_rate = 20;
+        plants[obj->y_grid][obj->x_grid] = obj;
+        total_suns -= obj->cost;  
+    }
+    else if (type == 2 && total_suns >= 100) // Sunflower
+    {
+        obj->type = type;
+        obj->put_down_time = time;
+        obj->x_grid = _x_grid;
+        obj->y_grid = _y_grid;
+        obj->x_pixel = grid_start_x + (20 * obj->x_grid);
+        obj->y_pixel = grid_start_y + (20 * obj->y_grid);
         obj->health = 100;
         obj->cost = 100;
         obj->name = "Peashooter";
         obj->firing_rate = 10;
-        plants[num_plants] = obj;
-        num_plants++;
-        total_suns -= obj->cost;
-        return obj;
+        plants[obj->y_grid][obj->x_grid] = obj;
+        total_suns -= obj->cost;        
     }
-    
+    else if (type == 3 && total_suns >= 50)
+    {
+        obj->type = type;
+        obj->x_grid = _x_grid;
+        obj->y_grid = _y_grid;
+        obj->x_pixel = grid_start_x + (20 * obj->x_grid);
+        obj->y_pixel = grid_start_y + (20 * obj->y_grid);
+        obj->health = 750;
+        obj->cost = 50;
+        obj->name = "Wall-nut";
+        plants[obj->y_grid][obj->x_grid] = obj;
+        total_suns -= obj->cost;      
+    }
+    else {
+        free(obj);
+    }
+
+    return obj;
 }
 
-struct zombie* create_zombie(int type, int x_loc, int y_loc)
+struct zombie* create_zombie(int type, int _x_grid, int _y_grid)
 {
     struct zombie* obj = malloc(sizeof(struct zombie));
     obj->type = type;
-    obj->x_grid = x_loc;
-    obj->y_grid = y_loc;
-    obj->x_pixel = grid_end_x - 20;
-    obj->y_pixel = grid_start_y + y_loc * 20;
+    obj->x_grid = _x_grid;
+    obj->y_grid = _y_grid;
+    obj->x_pixel = grid_start_x + (20 * obj->x_grid) + 20;
+    obj->y_pixel = grid_start_y + (20 * obj->y_grid);
     
 
     // if (type == 0) // Normal Stupid Zombie
     // {
-        obj->damage = 30;
+        obj->damage = 50;
         obj->health = 100;
-        obj->speed = 5;
-        obj->hit_rate = 5;
+        obj->speed = 1;
+        obj->hit_rate = 10;
     // }
 
-    zombies[num_zombies] = obj;
-    num_zombies++;
+    zombies[obj->y_grid][num_zombies_per_lane[obj->y_grid]] = obj;
+    num_zombies_per_lane[obj->y_grid]++;
     return obj;
 }
-struct projectile* create_projectile(int x_loc, int y_loc)
+struct projectile* create_projectile(int _x_grid, int _y_grid)
 {
     struct projectile* obj = malloc(sizeof(struct projectile));
-    obj->x_pixel = x_loc + 14;
-    obj->y_pixel = y_loc + 2;
+    obj->x_grid = _x_grid;
+    obj->y_grid = _y_grid;
+    obj->x_pixel = grid_start_x + (20 * obj->x_grid) + 14;
+    obj->y_pixel = grid_start_y + (20 * obj->y_grid) + 2;
+
+    // obj->x_pixel = x_loc + 14;
+    // obj->y_pixel = y_loc + 2;
     obj->speed = 3;
     obj->damage = 30;
 
-    projectiles[num_projectiles] = obj;
-    num_projectiles++;
+    projectiles[obj->y_grid][num_projectiles_per_lane[obj->y_grid]] = obj;
+    num_projectiles_per_lane[obj->y_grid]++;
     return obj;
 }
 
-void move_zombie(int index)
+struct lawnmower* create_lawnmower(int index, int _x_grid, int _y_grid)
 {
-    if (zombies[index]!= NULL)
+    struct lawnmower* obj = malloc(sizeof(struct projectile));
+    obj->is_lawnmower = true;
+    obj->x_grid = _x_grid;
+    obj->y_grid = _y_grid;
+    obj->x_pixel = grid_start_x + (20 * _x_grid);
+    obj->y_pixel = grid_start_y + (20 * _y_grid);
+    obj->speed = 10;
+    obj->damage = INT_MAX;
+
+    lawnmowers[index] = obj;
+    return obj;
+}
+
+void move_zombie(int row, int index)
+{
+    if (zombies[row][index]!= NULL)
     {
-        zombies[index]->x_pixel -= zombies[index]->speed;
+        zombies[row][index]->x_pixel -= zombies[row][index]->speed;
+        zombies[row][index]->x_grid = (zombies[row][index]->x_pixel - grid_start_x) / 20;
 
-        zombies[index]->x_grid = (zombies[index]->x_pixel - grid_start_x) / 20;
-
-        if (zombies[index]->x_pixel < grid_start_x)
+        if (zombies[row][index]->x_pixel < grid_start_x)
         {
-            if (lawnmowers[zombies[index]->y_grid] == NULL)
+            if (lawnmowers[zombies[row][index]->y_grid] == NULL)
                 game_over = true;
             else
-                lawnmowers[zombies[index]->y_grid]->is_lawnmower = false;
+                lawnmowers[zombies[row][index]->y_grid]->is_lawnmower = false;
 
-            free(zombies[index]);
-            zombies[index] = NULL;
+            free(zombies[row][index]);
+            zombies[row][index] = NULL;
         }
     }
 }
 
-void move_projectile(int index)
+void move_projectile(int row, int index)
 {
-    if (projectiles[index]!= NULL)
+    if (projectiles[row][index] != NULL)
     {
-        projectiles[index]->x_pixel += projectiles[index]->speed;
+        projectiles[row][index]->x_pixel += projectiles[row][index]->speed;
 
-        if (projectiles[index]->x_pixel > grid_end_x - 7)
+        if (projectiles[row][index]->x_pixel > grid_end_x - 7)
         {
-            free(projectiles[index]);
-            projectiles[index] = NULL;
+            free(projectiles[row][index]);
+            projectiles[row][index] = NULL;
         }
     }
+}
+
+void increment_suns() {
+    if (time % 10 == 0 && time > 0)
+        total_suns += 25;
 }
 
 void draw_suns()
@@ -912,6 +1140,7 @@ void draw_suns()
     int num = total_suns;
     int place = 0;
 
+    draw_black(260, 3, 60, 20);
     if (num == 0)
     {
         draw_num(305 - (place * 15), 3, num0_map, 12, 20);
