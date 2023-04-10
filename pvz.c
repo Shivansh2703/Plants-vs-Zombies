@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <stdint.h>
 // #include <time.h>
 
 /* Memory */
@@ -1556,6 +1557,7 @@ void MOUSE_ISR(){
 				mouse_x_pixel = (int)(mouse_x_pos * 0.264583 / 4);
 				mouse_y_pixel = (int)(mouse_y_pos * 0.264583 / 4);
 				//clicked_what(mouse_x_pixel, mouse_y_pixel);
+                plot_pixel(mouse_x_pixel, mouse_y_pixel, 0xFFFF);
 			}
 
 			PS2_data = *(PS2_ptr);
