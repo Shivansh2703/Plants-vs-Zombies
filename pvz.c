@@ -745,14 +745,27 @@ int main(void)
       }
 
       wait_for_vsync();
-		  pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+	  pixel_buffer_start = *(pixel_ctrl_ptr + 1);
 
       //wait on start screen
       while(start_screen){
       }
       
-    clear_screen();
-    wait_for_vsync();
+		wait_for_vsync();
+	  pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+		clear_screen();
+		wait_for_vsync();
+	  pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+		
+		//clear the text
+	   text_ptr = "                     \0";
+            /* assume that the text string fits on one line */
+      offset = (58 << 7) + 30;
+      while (*(text_ptr)) {
+        *(character_buffer + offset) = *(text_ptr); // write to the character buffer
+        ++text_ptr;
+        ++offset;
+      }
     //while the user has not quit the level or has not lost
     while (!game_over || !quit_level)
     {   
@@ -1445,7 +1458,7 @@ void MOUSE_ISR(){
 			if(byte1 & 0x2){
 				mouse_x_pixel = ceil(mouse_x_pos * 0.264583 / 4);
 				mouse_y_pixel = ceil(mouse_y_pos * 0.264583 / 4);
-				clicked_what(mouse_x_pixel, mouse_y_pixel);
+				//clicked_what(mouse_x_pixel, mouse_y_pixel);
 			}
 
 			PS2_data = *(PS2_ptr);
