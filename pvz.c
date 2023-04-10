@@ -160,6 +160,7 @@ void draw_lost_screen(void);
 void hex_display_passed(void);
 void hex_display_failed(void);
 void display_won_game(void);
+void hex_display_clear(void);
 
 struct plant{
     int health; //this is the amount of damage that the plant can take
@@ -737,6 +738,7 @@ int main(void)
     clear_screen();
     // game loop - put all animations inside
     while(1){
+        hex_display_clear();
     //loop in the start screen until the player requests to start
       start_screen = 1;
       draw_start_screen();
@@ -987,9 +989,12 @@ int main(void)
     }
     }
     
-    // pixel_buffer_start = *(pixel_ctrl_ptr + 1);
-    // clear_screen();
-    // wait_for_vsync();
+    pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+    clear_screen();
+    wait_for_vsync();
+    pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+    clear_screen();
+    wait_for_vsync();
 }
 
 void hex_display_passed(){
@@ -998,6 +1003,19 @@ void hex_display_passed(){
 
     //PASSED
 	unsigned char hex_segs[] = {0b0000000001011110, 0b0000000001111001, 0b0000000001101101, 0b0000000001101101, 0b0000000001110111, 0b0000000001110011, 0, 0};
+
+	/* drive the hex displays */
+	*(HEX3_HEX0_ptr) = *(int *)(hex_segs);
+	*(HEX5_HEX4_ptr) = *(int *)(hex_segs + 4);
+
+}
+
+void hex_display_clear(){
+    volatile int * HEX3_HEX0_ptr = (int *)HEX3_HEX0_BASE;
+	volatile int * HEX5_HEX4_ptr = (int *)HEX5_HEX4_BASE;
+
+    //Clear hex display
+	unsigned char hex_segs[] = {0, 0, 0, 0, 0, 0, 0, 0};
 
 	/* drive the hex displays */
 	*(HEX3_HEX0_ptr) = *(int *)(hex_segs);
@@ -1514,7 +1532,7 @@ void config_interval_timer()
 void MOUSE_ISR(){
 	volatile int * PS2_ptr = (int *)PS2_BASE;
 	int PS2_data, RVALID;
-	int d = 0, state = 0;
+	int d = 0, state = 0; 
 	PS2_data = *(PS2_ptr);
 	char byte1 = PS2_data & 0xFF;
 	PS2_data = *(PS2_ptr);
@@ -1522,7 +1540,6 @@ void MOUSE_ISR(){
 	PS2_data = *(PS2_ptr);
 	char byte3 = PS2_data & 0xFF;
 	RVALID = PS2_data & 0x8000; // extract the RVALID field
-	// PS/2 mouse needs to be reset (must be already plugged in)
 	
 	//while there is data to be read
 	if ((byte2 == (char)0xAA) && (byte1== (char)0xFA)){
