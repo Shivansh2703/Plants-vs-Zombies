@@ -707,15 +707,6 @@ int main(void)
     config_mouse();
     enable_A9_interrupts(); // enable interrupt
 
-    volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
-    pixel_buffer_start = *pixel_ctrl_ptr;
-    *(pixel_ctrl_ptr + 1) = 0xC8000000;
-    wait_for_vsync();
-    pixel_buffer_start = *pixel_ctrl_ptr;
-    clear_screen();
-    *(pixel_ctrl_ptr + 1) = 0xC0000000;
-    pixel_buffer_start = *(pixel_ctrl_ptr + 1);
-
     for (int row = 0; row < 10; row++)
     {
         for (int col = 0; col < 10; col++)
@@ -736,38 +727,48 @@ int main(void)
     int push_val = 0;
     int switch_val = 0;
 
-    clear_screen();
+    
     // game loop - put all animations inside
     while(1){
+        volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
+        pixel_buffer_start = *pixel_ctrl_ptr;
+        *(pixel_ctrl_ptr + 1) = 0xC8000000;
+        wait_for_vsync();
+        pixel_buffer_start = *pixel_ctrl_ptr;
+        clear_screen();
+        *(pixel_ctrl_ptr + 1) = 0xC0000000;
+        pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+        clear_screen();
         hex_display_clear();
-    //loop in the start screen until the player requests to start
-      start_screen = 1;
-      draw_start_screen();
-      //write text on screen
-      char* text_ptr = "Press Key 2 to Begin\0";
-      int offset;
-      volatile char * character_buffer = (char *)FPGA_CHAR_BASE; // video character buffer
-      /* assume that the text string fits on one line */
-      offset = (58 << 7) + 30;
-      while (*(text_ptr)) {
-        *(character_buffer + offset) = *(text_ptr); // write to the character buffer
-        ++text_ptr;
-        ++offset;
-      }
+        //loop in the start screen until the player requests to start
+        start_screen = 1;
+        draw_start_screen();
+        //write text on screen
+        char* text_ptr = "Press Key 2 to Begin\0";
+        int offset;
+        volatile char * character_buffer = (char *)FPGA_CHAR_BASE; // video character buffer
+        /* assume that the text string fits on one line */
+        offset = (58 << 7) + 30;
+        while (*(text_ptr)) {
+            *(character_buffer + offset) = *(text_ptr); // write to the character buffer
+            ++text_ptr;
+            ++offset;
+        }
 
-      wait_for_vsync();
-	  pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+        wait_for_vsync();
+        pixel_buffer_start = *(pixel_ctrl_ptr + 1);
 
       //wait on start screen
-      while(start_screen){
-      }
-      
-    wait_for_vsync();
-    pixel_buffer_start = *(pixel_ctrl_ptr + 1);
-    clear_screen();
-    wait_for_vsync();
-    pixel_buffer_start = *(pixel_ctrl_ptr + 1);
-    
+        while(start_screen){
+        }
+        
+        clear_screen();
+        wait_for_vsync();
+        pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+        clear_screen();
+        wait_for_vsync();
+        pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+
     //clear the text
     text_ptr = "                     \0";
         /* assume that the text string fits on one line */
@@ -946,7 +947,7 @@ int main(void)
     if(game_over && time < 1000){
       draw_lost_screen();
       wait_for_vsync();
-      pixel_buffer_start = *(pixel_ctrl_ptr + 1);
+      //pixel_buffer_start = *(pixel_ctrl_ptr + 1);
       hex_display_failed();
       game_over = 0;
       //timer before going back to start screen
@@ -989,13 +990,8 @@ int main(void)
 
     }
     }
-    
-    pixel_buffer_start = *(pixel_ctrl_ptr + 1);
-    clear_screen();
-    wait_for_vsync();
-    pixel_buffer_start = *(pixel_ctrl_ptr + 1);
-    clear_screen();
-    wait_for_vsync();
+    quit_level = 0;
+    game_over = 0;
 }
 
 void hex_display_passed(){
@@ -1342,8 +1338,8 @@ struct zombie* create_zombie(int type, int _x_grid, int _y_grid)
     // {
         obj->damage = 50;
         obj->health = 100;
-        obj->speed = 1;
-        obj->hit_rate = 10;
+        obj->speed = 20;
+        obj->hit_rate = 1;
     // }
 
     zombies[obj->y_grid][num_zombies_per_lane[obj->y_grid]] = obj;
