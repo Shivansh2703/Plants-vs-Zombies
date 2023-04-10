@@ -73,12 +73,6 @@
 #define ICDIPTR               0x800         // offset to interrupt processor targets regs
 #define ICDICFR               0xC00         // offset to interrupt configuration regs
 
-int mouse_x_pos = 0;
-int mouse_y_pos = 0;
-
-int mouse_x_pixel = 0;
-int mouse_y_pixel = 0;
-
 int sunflower_selected = 0;
 int peashooter_selected = 0;
 int wallnut_selected = 0;
@@ -152,7 +146,7 @@ void draw_start_screen(void);
 void draw_pause_screen(void);
 void move_zombie(int row, int index);
 void move_projectile(int row, int index);
-void put_plant(int _prev_value, int _push_val, int _switch_val);
+void put_plant(int x_coord, int y_coord, int plant_type);
 struct plant* create_plant(int type, int _x_grid, int _y_grid);
 struct projectile* create_projectile(int _x_grid, int _y_grid);
 struct zombie* create_zombie(int type, int _x_grid, int _y_grid);
@@ -696,6 +690,9 @@ struct lawnmower* lawnmowers[10];
 
 int time = 0;
 int total_suns = 0;
+volatile int plant_selected = -1;
+volatile int curr_grid_x = 0;
+volatile int curr_grid_y = 0;
 
 
 int main(void)
@@ -730,6 +727,10 @@ int main(void)
     
     // game loop - put all animations inside
     while(1){
+        plant_selected = -1;
+        curr_grid_x = 0;
+        curr_grid_y = 0;
+
         volatile int * pixel_ctrl_ptr = (int *)0xFF203020;
         pixel_buffer_start = *pixel_ctrl_ptr;
         *(pixel_ctrl_ptr + 1) = 0xC8000000;
@@ -809,7 +810,6 @@ int main(void)
         // draw_peashooter_icon(0, 70);
         increment_suns();
         draw_suns();
-        put_plant(prev_val, push_val, switch_val);
 
         if (time % 50 == 0) // Change according to level
         {
@@ -1175,8 +1175,11 @@ void draw_grass() {
 	for (int col = -1; col < 11; col++){
 		for (int row = -1; row < 11; row++){
             if (col != -1 && col != 10 && row != -1 && row != 10)
-            {
-                if ((col + row) % 4 == 0)
+            {   
+                if(col == curr_grid_y && row == curr_grid_x)
+                    draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass1_map);
+                    //draw greyed out image
+                else if ((col + row) % 4 == 0)
 			        draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass1_map);
                 else if ((col + row)% 4 == 1)
                     draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass3_map);
@@ -1244,28 +1247,10 @@ void draw_plant(int type, int x_loc, int y_loc)
     }
 }
 
-void put_plant(int _prev_value, int _push_val, int _switch_val)
+void put_plant(int x_coord, int y_coord, int plant_type)
 {
-    if (_prev_value == 1 && _push_val == 0)
-    {
-        int x_coor = _switch_val & 0x0F;
-        int y_coor = (_switch_val & 0xF0) >> 4;
-        if (plants[y_coor - 1][x_coor - 1] == NULL)
-            create_plant(1, x_coor - 1, y_coor - 1);
-    }
-    else if (_prev_value == 2 && _push_val == 0)
-    {
-        int x_coor = _switch_val & 0x0F;
-        int y_coor = (_switch_val & 0xF0) >> 4;
-        if (plants[y_coor - 1][x_coor - 1] == NULL)
-            create_plant(2, x_coor - 1, y_coor - 1);
-    }
-    else if (_prev_value == 4 && _push_val == 0)
-    {
-        int x_coor = _switch_val & 0x0F;
-        int y_coor = (_switch_val & 0xF0) >> 4;
-        if (plants[y_coor - 1][x_coor - 1] == NULL)
-            create_plant(3, x_coor - 1, y_coor - 1);
+    if(plants[y_coord][x_coord] == NULL){
+        create_plant(plant_type, x_coord, y_coord);
     }
 }
 
@@ -1532,37 +1517,90 @@ void MOUSE_ISR(){
 	int d = 0, state = 0; 
 	PS2_data = *(PS2_ptr);
 	char byte1 = PS2_data & 0xFF;
-	PS2_data = *(PS2_ptr);
-	char byte2 = PS2_data & 0xFF;
-	PS2_data = *(PS2_ptr);
-	char byte3 = PS2_data & 0xFF;
-	RVALID = PS2_data & 0x8000; // extract the RVALID field
+	char byte2;
+    char byte3;
+    RVALID = PS2_data & 0x8000; 
 	
 	//while there is data to be read
-	if ((byte2 == (char)0xAA) && (byte1== (char)0xFA)){
-		// mouse inserted; initialize sending of data
-		*(PS2_ptr) = 0xF4;
-	}
-	
-	else {
-		while (RVALID) {
-			mouse_x_pos = mouse_x_pos + byte2;
-			mouse_y_pos = mouse_y_pos + byte3;
-			//only plot the pixel is the right mouse was clicked
-			if(byte1 & 0x2){
-				mouse_x_pixel = (int)(mouse_x_pos * 0.264583 / 4);
-				mouse_y_pixel = (int)(mouse_y_pos * 0.264583 / 4);
-				//clicked_what(mouse_x_pixel, mouse_y_pixel);
-                plot_pixel(mouse_x_pixel, mouse_y_pixel, 0xFFFF);
-			}
+    while (RVALID) {
+        if(byte1 == 0xE0){
+            PS2_data = *(PS2_ptr);
+	        byte2 = PS2_data & 0xFF;
+            if(byte2 == 0x72){
+                //down
+                if(curr_grid_y < 9){
+                    curr_grid_y += 1;
+                }
+            }
+            else if(byte2 == 0x75){
+                //up
+                if(curr_grid_y > 0){
+                    curr_grid_y -= 1;
+                }
+            }
+            else if(byte2 == 0x6B){
+                //left
+                if(curr_grid_x > 0){
+                    curr_grid_x-=1;
+                }
+            }
+            else if(byte2 == 0x74){
+                //right
+                if(curr_grid_x < 9){
+                    curr_grid_x += 1;
+                }
+            }
+            for(int i = 0; i < 3; i++){
+                //get rid of the break release keys
+                PS2_data = *(PS2_ptr);
+            }
+        }
+        else if(byte1 == 0x5A){
+            //F0,5A
+            //enter key
+            //if a plant has been selected, we can put the plant
+            if(plant_selected != -1){
+                put_plant(curr_grid_x, curr_grid_y, plant_selected);
+            }
 
-			PS2_data = *(PS2_ptr);
-			byte1 = PS2_data & 0xFF;
-			byte2 = *(PS2_ptr) & 0xFF;
-			byte3 = *(PS2_ptr) & 0xFF;
-			RVALID = PS2_data & 0x8000; // extract the RVALID field
-		}
-	}
+            for(int i = 0; i < 2; i++){
+                //get rid of the break release keys
+                PS2_data = *(PS2_ptr);
+            }
+        }
+        else if(byte1 == 0x16){
+            //1 key
+            plant_selected = 1; //sunflower
+            
+            for(int i = 0; i < 2; i++){
+                //get rid of the break release keys
+                PS2_data = *(PS2_ptr);
+            }
+        }
+        else if(byte1 == 0x1E){
+            //2 key
+            plant_selected = 2; //peashooter
+
+            for(int i = 0; i < 2; i++){
+                //get rid of the break release keys
+                PS2_data = *(PS2_ptr);
+            }
+        }
+        else if(byte1 == 0x26){
+            //3 key
+            plant_selected = 3; //wallnut
+
+            for(int i = 0; i < 2; i++){
+                //get rid of the break release keys
+                PS2_data = *(PS2_ptr);
+            }
+        }
+
+        PS2_data = *(PS2_ptr);
+        byte1 = PS2_data & 0xFF;
+        RVALID = PS2_data & 0x8000; // extract the RVALID field
+    }
+	
 }
 
 void HEX_PS2(int mouse_x_pos) {
