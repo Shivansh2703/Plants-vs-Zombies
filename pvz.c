@@ -691,7 +691,7 @@ const uint8_t square_map[] = {
     0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 
     0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 
     0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 0x00, 0xf8, 
-}
+};
 
 volatile int pixel_buffer_start;
 volatile int *push_buttons = (int *)0xFF200050;
@@ -1254,7 +1254,7 @@ void draw_grass() {
             if (col != -1 && col != 10 && row != -1 && row != 10)
             {   
                 if(col == curr_grid_y && row == curr_grid_x)
-                    draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass1_map);
+                    draw_img(grid_start_x + (20*col), grid_start_y + (20*row), square_map);
                     //draw greyed out image
                 else if ((col + row) % 4 == 0)
 			        draw_img(grid_start_x + (20*col), grid_start_y + (20*row), grass1_map);
@@ -1400,7 +1400,7 @@ struct zombie* create_zombie(int type, int _x_grid, int _y_grid)
     // {
         obj->damage = 50;
         obj->health = 100;
-        obj->speed = 20;
+        obj->speed = 1;
         obj->hit_rate = 1;
     // }
 
@@ -1605,26 +1605,29 @@ void MOUSE_ISR(){
 	        byte2 = PS2_data & 0xFF;
             if(byte2 == 0x72){
                 //down
-                if(curr_grid_y < 9){
-                    curr_grid_y += 1;
+                if(curr_grid_x < 9){
+                    curr_grid_x += 1;
                 }
             }
             else if(byte2 == 0x75){
                 //up
-                if(curr_grid_y > 0){
-                    curr_grid_y -= 1;
+                if(curr_grid_x > 0){
+                    curr_grid_x-=1;
                 }
+               
             }
             else if(byte2 == 0x6B){
                 //left
-                if(curr_grid_x > 0){
-                    curr_grid_x-=1;
+                
+                 if(curr_grid_y > 0){
+                    curr_grid_y -= 1;
                 }
             }
             else if(byte2 == 0x74){
                 //right
-                if(curr_grid_x < 9){
-                    curr_grid_x += 1;
+                
+                if(curr_grid_y < 9){
+                    curr_grid_y += 1;
                 }
             }
             for(int i = 0; i < 3; i++){
@@ -1637,7 +1640,7 @@ void MOUSE_ISR(){
             //enter key
             //if a plant has been selected, we can put the plant
             if(plant_selected != -1){
-                put_plant(curr_grid_x, curr_grid_y, plant_selected);
+                put_plant(curr_grid_y, curr_grid_x, plant_selected);
             }
 
             for(int i = 0; i < 2; i++){
