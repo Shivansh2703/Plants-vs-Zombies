@@ -775,7 +775,7 @@ int main(void)
         ++offset;
     }
     //while the user has not quit the level or has not lost
-    while (!game_over && !quit_level)
+    while (!game_over && !quit_level && time < 1000)
     {   
       //if the player has paused the game, we wait until unpaused 
         if(pause){
@@ -940,14 +940,14 @@ int main(void)
 		time++;
     } 
 
-    if(game_over){
+    if(game_over && time < 1000){
       draw_lost_screen();
       wait_for_vsync();
       pixel_buffer_start = *(pixel_ctrl_ptr + 1);
       hex_display_failed();
       game_over = 0;
       //timer before going back to start screen
-      for(int i = 0; i < 8; i++){
+      for(int i = 0; i < 20; i++){
         //loop through 8 times to get 2 seconds
         *((int*)(MPCORE_PRIV_TIMER)) = 2000000 ; //set the start value for 0.25 second
         *((int*)(MPCORE_PRIV_TIMER) + 2) = 1; //enable the timer
@@ -966,12 +966,13 @@ int main(void)
        start_screen = 1;
     }
 
-    else{
+    else if (time >= 1000)
+    {
       //otherwise passed the level
         display_won_game();
         hex_display_passed();
 
-        for(int i = 0; i < 8; i++){
+        for(int i = 0; i < 20; i++){
             //loop through 8 times to get 2 seconds
             *((int*)(MPCORE_PRIV_TIMER)) = 2000000 ; //set the start value for 0.25 second
             *((int*)(MPCORE_PRIV_TIMER) + 2) = 1; //enable the timer
