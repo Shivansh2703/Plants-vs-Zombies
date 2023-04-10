@@ -989,10 +989,64 @@ int main(void)
         start_screen = 0;
 
     }
+
+    bool game_over = false;
+    int plant_types[5] = {1, 2, 3, 4, 5};
+    int time = 0;
+    int total_suns = 0;
+
+    for (int i = 0; i < 10; i++)
+    {
+    for (int j = 0; j < 100; j++)
+    {
+    if (zombies[i][j] != NULL){
+    free(zombies[i][j]);
+    zombies[i][j] = NULL;
     }
+    }
+    }
+
+    for (int i = 0; i < 10; i++)
+    {
+        for (int j = 0; j < 10000; j++)
+        {
+            if (projectiles[i][j] != NULL) {
+            free(projectiles[i][j]);
+            projectiles[i][j] = NULL;
+            }
+        }
+    }
+
+
+    for (int row = 0; row < 10; row++)
+    {
+        for (int col = 0; col < 10; col++)
+        {
+            if (plants[row][col] != NULL) {
+            free(plants[row][col]);
+            plants[row][col] = NULL;
+            }
+        }
+    }
+
+    for (int i = 0; i < 10; i++)
+    {
+        num_zombies_per_lane[i] = 0;
+        num_projectiles_per_lane[i] = 0;
+    }
+
+    for (int i = 0; i < 10; i++)
+    {
+        create_lawnmower(i, -1, i);
+    }
+
     quit_level = 0;
     game_over = 0;
+    }
 }
+    
+
+
 
 void hex_display_passed(){
     volatile int * HEX3_HEX0_ptr = (int *)HEX3_HEX0_BASE;
