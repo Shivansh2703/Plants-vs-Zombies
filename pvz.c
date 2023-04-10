@@ -1535,15 +1535,15 @@ void MOUSE_ISR(){
 			mouse_y_pos = mouse_y_pos + byte3;
 			//only plot the pixel is the right mouse was clicked
 			if(byte1 & 0x2){
-				mouse_x_pixel = ceil(mouse_x_pos * 0.264583 / 4);
-				mouse_y_pixel = ceil(mouse_y_pos * 0.264583 / 4);
+				mouse_x_pixel = (int)(mouse_x_pos * 0.264583 / 4);
+				mouse_y_pixel = (int)(mouse_y_pos * 0.264583 / 4);
 				//clicked_what(mouse_x_pixel, mouse_y_pixel);
 			}
 
 			PS2_data = *(PS2_ptr);
-			char byte1 = PS2_data & 0xFF;
-			char byte2 = *(PS2_ptr) & 0xFF;
-			char byte3 = *(PS2_ptr) & 0xFF;
+			byte1 = PS2_data & 0xFF;
+			byte2 = *(PS2_ptr) & 0xFF;
+			byte3 = *(PS2_ptr) & 0xFF;
 			RVALID = PS2_data & 0x8000; // extract the RVALID field
 		}
 	}
